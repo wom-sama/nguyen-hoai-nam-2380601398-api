@@ -35,16 +35,16 @@ export async function transaction(pool, action) {
   catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 }
-export function rateLimit({ windowMs = 15 * 60000, max = 100, now = () => new Date() } = {}) {
+export function rateLimit({ windowMs = 15 * 60000, max = 100, now = () => new Date(), key = req => req.ip } = {}) {
   const buckets = new Map();
   let nextSweep = 0;
   return (req, res, next) => {
     const time = now().getTime();
     if (time >= nextSweep) { for (const [key, bucket] of buckets) if (bucket.until <= time) buckets.delete(key); nextSweep = time + 60000; }
-    const key = req.ip;
-    const bucket = buckets.get(key) ?? { count: 0, until: time + windowMs };
+    const bucketKey = key(req);
+    const bucket = buckets.get(bucketKey) ?? { count: 0, until: time + windowMs };
     if (bucket.until <= time) { bucket.count = 0; bucket.until = time + windowMs; }
-    bucket.count++; buckets.set(key, bucket);
+    bucket.count++; buckets.set(bucketKey, bucket);
     if (bucket.count > max) { res.set('Retry-After', String(Math.ceil((bucket.until - time) / 1000))); return next(new ApiError(429, 'RATE_LIMITED', 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.')); }
     next();
   };

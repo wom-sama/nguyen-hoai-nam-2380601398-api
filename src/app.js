@@ -15,6 +15,16 @@ export function createApp({ pool, config, mailer, now = () => new Date(), pushPr
     res.set({ 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' });
     next();
   });
+  const auth = createAuth({ pool, config, mailer, now });
+  const failedProfileAuth = rateLimit({ now, max: 500 });
+  // Profile polling has a bounded pre-auth IP gate and, after JWT/session
+  // verification, a user budget shared across that user's devices and IPs.
+  app.get('/v1/me', rateLimit({ now, max: 3600 }), (req, res, next) =>
+    auth.requireAuth(req, res, error => {
+      if (error) return failedProfileAuth(req, res, limitError => next(limitError ?? error));
+      next();
+    }), rateLimit({ now, max: 180, key: req => req.user.id }),
+  (req, res) => res.json({ data: publicUser(req.user) }));
   app.use(rateLimit({ now, max: 500 }));
   app.use(express.json({ limit: '3mb', strict: true }));
   if (autoStartNotifications) app.use((req, res, next) => {
@@ -25,9 +35,7 @@ export function createApp({ pool, config, mailer, now = () => new Date(), pushPr
     try { await pool.query('SELECT 1'); res.json({ data: { status: 'ok', service: 'attendance-api' } }); }
     catch { res.status(503).json({ error: { code: 'DATABASE_UNAVAILABLE', message: 'Cơ sở dữ liệu chưa sẵn sàng.' } }); }
   });
-  const auth = createAuth({ pool, config, mailer, now });
   app.use('/v1/auth', auth.router);
-  app.get('/v1/me', auth.requireAuth, (req, res) => res.json({ data: publicUser(req.user) }));
   app.use('/v1', auth.requireAuth, auth.requireActive, notifications.router, createCameraTranslations({pool,now}),
     createResources({ pool, now, timeZone: config.timeZone, enqueueNotification: notifications.enqueue }));
   app.use((_req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy API.' } }));

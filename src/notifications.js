@@ -6,7 +6,7 @@ import { createFcmProvider, PushDeliveryError } from './fcm.js';
 
 const deviceSchema = z.object({ installationId: z.string().regex(/^[A-Za-z0-9_-]{22}$/),
   firebaseProjectId: z.string().min(6).max(30), platform: z.literal('android') }).strict();
-const eventTypes = new Set(['shift_assigned', 'correction_reviewed', 'handover_submitted']);
+const eventTypes = new Set(['shift_assigned', 'correction_reviewed', 'handover_submitted', 'profile_updated']);
 const liveDevices = `SELECT DISTINCT d.* FROM notification_devices d JOIN users u ON u.id=d.user_id JOIN sessions s ON s.id=d.session_id AND s.user_id=u.id JOIN refresh_tokens r ON r.session_id=s.id
   WHERE u.status='active' AND u.email_verified=true AND u.deleted_at IS NULL AND s.revoked_at IS NULL AND r.consumed_at IS NULL AND r.expires_at>$1`;
 
@@ -43,6 +43,7 @@ export function createNotifications({ pool, config, now = () => new Date(), prov
   async function enqueue(db, { type, entityId, version = 1, recipientId }) {
     if (!enabled) return;
     if (!eventTypes.has(type) || !id.safeParse(entityId).success || !id.safeParse(recipientId).success || !Number.isInteger(version) || version < 1) throw new Error('Invalid internal notification event.');
+    if (type === 'profile_updated' && entityId !== recipientId) throw new Error('Invalid profile notification recipient.');
     const time = now();
     const devices = (await db.query(`${liveDevices} AND d.user_id=$2`, [time, recipientId])).rows;
     for (const device of devices) await db.query(`INSERT INTO notification_outbox(id,event_key,event_type,entity_id,entity_version,recipient_id,device_id,delivery_binding_id,available_at,expires_at,created_at)
@@ -50,6 +51,11 @@ export function createNotifications({ pool, config, now = () => new Date(), prov
     [randomUUID(), `${type}:${entityId}:${version}`, type, entityId, version, recipientId, device.id, time, new Date(time.getTime() + 24 * 3600000)]);
   }
   async function stillRelevant(event) {
+    if (event.event_type === 'profile_updated') {
+      if (event.entity_id !== event.recipient_id) return false;
+      const row = (await pool.query('SELECT profile_version,status,email_verified,deleted_at FROM users WHERE id=$1', [event.entity_id])).rows[0];
+      return row?.status === 'active' && row.email_verified && !row.deleted_at && row.profile_version === event.entity_version;
+    }
     if (event.event_type === 'shift_assigned') {
       const row = (await pool.query('SELECT employee_id,assignment_version FROM shifts WHERE id=$1', [event.entity_id])).rows[0];
       return row?.employee_id === event.recipient_id && row.assignment_version === event.entity_version;

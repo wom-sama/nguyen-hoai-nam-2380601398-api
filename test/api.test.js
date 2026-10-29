@@ -19,6 +19,7 @@ beforeEach(async () => {
     // pg-mem numbers unnamed CHECKs; PostgreSQL names this column CHECK below.
     // Match its real name so migration 006 replaces the same constraint in both.
     if (file === '001_initial.sql') sql = sql.replace('CHECK (radius_meters BETWEEN 20 AND 5000)', 'CONSTRAINT branches_radius_meters_check CHECK (radius_meters BETWEEN 20 AND 5000)');
+    if (file === '003_push_notifications.sql') sql = sql.replace("CHECK (event_type IN ('shift_assigned','correction_reviewed','handover_submitted'))", "CONSTRAINT notification_outbox_event_type_check CHECK (event_type IN ('shift_assigned','correction_reviewed','handover_submitted'))");
     db.public.none(sql);
   }
   const adapter = db.adapters.createPg();
@@ -89,6 +90,43 @@ async function advanceTo(time, ...users) {
   }
 }
 const fid = n => `c${String(n).padStart(21, '0')}`;
+test('profile polling budgets are independent for two verified users behind one IP and do not consume other API limits', async () => {
+  const a = await account(), b = await account(); // Four ordinary auth requests.
+  for (let i = 0; i < 180; i++) assert.equal((await api().get('/v1/me').set(auth(a.accessToken))).status, 200);
+  const aDenied = await api().get('/v1/me').set(auth(a.accessToken));
+  assert.equal(aDenied.status, 429); assert.equal(aDenied.body.error.code, 'RATE_LIMITED');
+  for (let i = 0; i < 180; i++) assert.equal((await api().get('/v1/me').set(auth(b.accessToken))).status, 200);
+  assert.equal((await api().get('/v1/me').set(auth(b.accessToken))).status, 429);
+  for (let i = 0; i < 496; i++) assert.equal((await api().get('/v1/health')).status, 200);
+  assert.equal((await api().get('/v1/health')).status, 429, 'all other routes retain the shared 500/IP limit');
+});
+
+test('invalid profile JWTs cannot create verified-user buckets or evade the failed-auth IP limit', async () => {
+  const user = await account();
+  for (let i = 0; i < 500; i++) {
+    const claims = Buffer.from(JSON.stringify({ sub: randomUUID() })).toString('base64url');
+    const result = await api().get('/v1/me').set(auth(`eyJhbGciOiJIUzI1NiJ9.${claims}.invalid_signature`)).set('X-Forwarded-For', `10.0.${Math.floor(i / 255)}.${i % 255}`);
+    assert.equal(result.status, 401);
+  }
+  const denied = await api().get('/v1/me');
+  assert.equal(denied.status, 429); assert.equal(denied.body.error.code, 'RATE_LIMITED');
+  assert.equal((await api().get('/v1/me').set(auth(user.accessToken))).status, 200);
+  assert.equal((await api().get('/v1/health')).status, 200);
+});
+
+test('profile admission rejects an exhausted IP before JWT session lookup and leaves other routes protected separately', async () => {
+  const user = await account();
+  const query = pool.query.bind(pool); let sessionLookups = 0;
+  pool.query = (sql, ...parameters) => {
+    if (sql.startsWith('SELECT u.* FROM users u JOIN sessions')) sessionLookups++;
+    return query(sql, ...parameters);
+  };
+  for (let i = 0; i < 3600; i++) assert.equal((await api().get('/v1/me').set(auth('invalid.jwt.signature'))).status, i < 500 ? 401 : 429);
+  const denied = await api().get('/v1/me').set(auth(user.accessToken));
+  assert.equal(denied.status, 429); assert.equal(sessionLookups, 0);
+  assert.equal((await api().get('/v1/health')).status, 200);
+});
+
 test('branch radius accepts the inclusive 20m to 200km range and rejects values outside it', async () => {
   const admin = await account({ role: 'admin' });
   const body = { name: 'Test wide branch', address: 'Synthetic test area', latitude: 10, longitude: 106, radiusMeters: 200000 };
@@ -407,6 +445,55 @@ test('incorrect password never sends a login OTP', async () => {
   assert.equal(result.status, 401);
   assert.equal(mail.length, count);
 });
+
+test('three account emails remain isolated through registration, approval, login and OTP resend', async () => {
+  const admin = await account({ role: 'admin' }), users = [admin];
+  for (const suffix of ['a','b']) {
+    const address = `recipient-${suffix}@example.test`;
+    const registration = await register({ username: `recipient_${suffix}`, email: address });
+    assert.equal(registration.status, 202); assert.equal(mail.at(-1).email, address);
+    assert.equal(mail.at(-1).purpose, 'register');
+    const verified = await verify(registration.body.data.challengeId, mail.at(-1).code);
+    assert.equal(verified.status, 200); assert.equal(verified.body.data.user.email, address);
+    assert.equal(verified.body.data.user.status, 'pending');
+    const user = verified.body.data.user; users.push(user);
+    const approved = await api().patch(`/v1/employees/${user.id}`).set(auth(admin.accessToken)).send({ email: address, status: 'active' });
+    assert.equal(approved.status, 200); assert.equal(approved.body.data.email, address);
+  }
+  assert.equal(new Set(users.map(user => user.email)).size, 3);
+  timestamp += 61000;
+  const challenges = [];
+  for (const user of users) {
+    const login = await api().post('/v1/auth/login').send({ username: user.username, password });
+    assert.equal(login.status, 200); assert.equal(mail.at(-1).email, user.email);
+    assert.equal(mail.at(-1).purpose, 'login');
+    challenges.push({ user, id: login.body.data.challengeId, code: mail.at(-1).code });
+  }
+  timestamp += 61000;
+  for (const challenge of challenges) {
+    const previousCode = challenge.code;
+    assert.equal((await api().post('/v1/auth/resend-otp').send({ challengeId: challenge.id })).status, 200);
+    assert.equal(mail.at(-1).email, challenge.user.email); assert.equal(mail.at(-1).purpose, 'login');
+    challenge.code = mail.at(-1).code;
+    assert.equal((await verify(challenge.id, previousCode)).status, 401);
+  }
+  const [, a, b] = challenges;
+  // If two random six-digit codes coincide, a resend necessarily changes B's
+  // previous code. This keeps the cross-account test deterministic without
+  // replacing OTP generation, hashes or the verification handler.
+  if (a.code === b.code) {
+    timestamp += 61000;
+    assert.equal((await api().post('/v1/auth/resend-otp').send({ challengeId: b.id })).status, 200);
+    assert.equal(mail.at(-1).email, b.user.email); b.code = mail.at(-1).code;
+  }
+  assert.equal((await verify(a.id, b.code)).status, 401);
+  assert.equal((await verify(b.id, a.code)).status, 401);
+  for (const challenge of challenges) {
+    const verified = await verify(challenge.id, challenge.code);
+    assert.equal(verified.status, 200); assert.equal(verified.body.data.user.id, challenge.user.id);
+    assert.equal(verified.body.data.user.email, challenge.user.email);
+  }
+});
 test('email OTP is consumed once and attempts cannot be reset by submitting the correct code', async () => {
   const result = await register();
   const id = result.body.data.challengeId;
@@ -482,6 +569,99 @@ test('partial employee updates preserve omitted role, status and branch fields',
   assert.equal(result.body.data.role, 'admin');
   assert.equal(result.body.data.status, 'active');
   assert.equal(result.body.data.fullName, 'Updated Admin Name');
+});
+
+test('an unchanged email in a full employee form preserves sessions, devices and a pending OTP while applying fresh permissions', async () => {
+  const admin = await account({ role: 'admin' });
+  const oldBranch = await branch(admin, 'Previous branch'), newBranch = await branch(admin, 'New branch');
+  const employee = await account({ branchId: oldBranch.id });
+  const device = await linkDevice(employee);
+  timestamp += 61000;
+  const challenge = await api().post('/v1/auth/login').send({ username: employee.username, password });
+  assert.equal(challenge.status, 200);
+  const code = mail.at(-1).code;
+  const result = await api().patch(`/v1/employees/${employee.id}`).set(auth(admin.accessToken)).send({
+    fullName: 'Updated Branch Manager', username: employee.username, email: employee.email.toUpperCase(),
+    role: 'manager', status: 'active', branchId: newBranch.id,
+  });
+  assert.equal(result.status, 200);
+  const me = await api().get('/v1/me').set(auth(employee.accessToken));
+  assert.equal(me.status, 200); assert.equal(me.body.data.role, 'manager');
+  assert.equal(me.body.data.branchId, newBranch.id); assert.equal(me.body.data.fullName, 'Updated Branch Manager');
+  assert.equal(me.body.data.emailVerified, true);
+  assert.equal((await api().get(`/v1/branches/${oldBranch.id}`).set(auth(employee.accessToken))).status, 404);
+  assert.equal((await api().get(`/v1/branches/${newBranch.id}`).set(auth(employee.accessToken))).status, 200);
+  assert.equal((await pool.query('SELECT id FROM notification_devices WHERE user_id=$1', [employee.id])).rows[0].id, device.id);
+  assert.equal((await pool.query('SELECT consumed_at FROM otp_challenges WHERE id=$1', [challenge.body.data.challengeId])).rows[0].consumed_at, null);
+  assert.equal((await verify(challenge.body.data.challengeId, code)).status, 200);
+  assert.equal((await api().post('/v1/auth/refresh').send({ refreshToken: employee.refreshToken })).status, 200);
+});
+
+test('actual email changes, password updates and suspension still revoke all sessions, devices and pending OTPs', async () => {
+  const admin = await account({ role: 'admin' });
+  for (const [index, changes] of [{ email: 'changed@example.test' }, { password: 'A-different-test-password-29' }, { status: 'suspended' }].entries()) {
+    const employee = await account(); await linkDevice(employee, fid(index + 10));
+    timestamp += 61000;
+    const challenge = await api().post('/v1/auth/login').send({ username: employee.username, password });
+    assert.equal(challenge.status, 200); const code = mail.at(-1).code;
+    const result = await api().patch(`/v1/employees/${employee.id}`).set(auth(admin.accessToken)).send({ email: employee.email, ...changes });
+    assert.equal(result.status, 200); assert.equal(result.body.data.emailVerified, !changes.email);
+    const sessions = (await pool.query('SELECT revoked_at FROM sessions WHERE user_id=$1', [employee.id])).rows;
+    assert.ok(sessions.length); assert.ok(sessions.every(session => session.revoked_at !== null));
+    assert.equal((await pool.query('SELECT id FROM notification_devices WHERE user_id=$1', [employee.id])).rowCount, 0);
+    assert.notEqual((await pool.query('SELECT consumed_at FROM otp_challenges WHERE id=$1', [challenge.body.data.challengeId])).rows[0].consumed_at, null);
+    assert.equal((await api().get('/v1/me').set(auth(employee.accessToken))).status, 401);
+    assert.equal((await api().post('/v1/auth/refresh').send({ refreshToken: employee.refreshToken })).status, 401);
+    assert.equal((await verify(challenge.body.data.challengeId, code)).status, 401);
+    await app.locals.notifications.drain(); assert.equal(pushes.length, 0);
+  }
+});
+
+test('profile updates notify only the affected account and only actual latest profile changes', async () => {
+  const admin = await account({ role: 'admin' }), office = await branch(admin);
+  const employee = await account({ branchId: office.id }), other = await account({ branchId: office.id });
+  await linkDevice(employee); await linkDevice(other, fid(2));
+  const patch = body => api().patch(`/v1/employees/${employee.id}`).set(auth(admin.accessToken)).send(body);
+  assert.equal((await patch({ email: employee.email, fullName: employee.fullName, role: 'employee', status: 'active', branchId: office.id })).status, 200);
+  assert.equal((await pool.query('SELECT id FROM notification_outbox')).rowCount, 0);
+  assert.equal((await api().patch(`/v1/employees/${employee.id}`).set(auth(other.accessToken)).send({ role: 'manager' })).status, 403);
+  assert.equal((await patch({ email: employee.email, role: 'manager' })).status, 200);
+  let rows = (await pool.query('SELECT * FROM notification_outbox')).rows;
+  assert.equal(rows.length, 1); assert.equal(rows[0].event_type, 'profile_updated');
+  assert.equal(rows[0].entity_id, employee.id); assert.equal(rows[0].recipient_id, employee.id);
+  assert.equal(pushes.length, 0, 'provider is not called inside the profile transaction');
+  assert.equal((await patch({ role: 'manager', email: employee.email })).status, 200);
+  assert.equal((await pool.query('SELECT id FROM notification_outbox')).rowCount, 1);
+  assert.equal((await patch({ fullName: 'Latest Profile Name' })).status, 200);
+  await app.locals.notifications.drain();
+  rows = (await pool.query('SELECT * FROM notification_outbox ORDER BY entity_version')).rows;
+  assert.equal(rows.length, 2); assert.equal(rows[0].status, 'skipped'); assert.equal(rows[1].status, 'sent');
+  assert.equal(pushes.length, 1); assert.equal(pushes[0].event_type, 'profile_updated');
+  assert.equal(pushes[0].recipient_id, employee.id); assert.equal(pushes[0].entity_id, employee.id); assert.equal(pushes[0].fid, fid(1));
+  assert.equal((await api().get('/v1/me').set(auth(employee.accessToken))).body.data.fullName, 'Latest Profile Name');
+});
+
+test('profile updates cannot follow a shared device to another account or a logged-out session', async () => {
+  const admin = await account({ role: 'admin' }), employee = await account(), other = await account();
+  await linkDevice(employee);
+  assert.equal((await api().patch(`/v1/employees/${employee.id}`).set(auth(admin.accessToken)).send({ fullName: 'Changed Before Rebinding' })).status, 200);
+  await linkDevice(other);
+  await app.locals.notifications.drain(); assert.equal(pushes.length, 0);
+  assert.equal((await pool.query('SELECT status FROM notification_outbox')).rows[0].status, 'skipped');
+  await linkDevice(employee, fid(2));
+  assert.equal((await api().patch(`/v1/employees/${employee.id}`).set(auth(admin.accessToken)).send({ fullName: 'Changed Before Logout' })).status, 200);
+  assert.equal((await api().post('/v1/auth/logout').send({ refreshToken: employee.refreshToken })).status, 200);
+  await app.locals.notifications.drain(); assert.equal(pushes.length, 0);
+  assert.ok((await pool.query('SELECT status FROM notification_outbox')).rows.every(row => row.status === 'skipped'));
+});
+
+test('an admin may receive its own profile update without losing the last-admin protection', async () => {
+  const admin = await account({ role: 'admin' }); await linkDevice(admin);
+  assert.equal((await api().patch(`/v1/employees/${admin.id}`).set(auth(admin.accessToken)).send({ email: admin.email, fullName: 'Renamed Current Admin' })).status, 200);
+  assert.equal((await api().patch(`/v1/employees/${admin.id}`).set(auth(admin.accessToken)).send({ role: 'employee' })).status, 409);
+  await app.locals.notifications.drain();
+  assert.equal(pushes.length, 1); assert.equal(pushes[0].recipient_id, admin.id);
+  assert.equal((await api().get('/v1/me').set(auth(admin.accessToken))).body.data.role, 'admin');
 });
 test('partial shift update does not reset a recorded in-progress shift', async () => {
   const { admin, employee, duty } = await workplace();
