@@ -597,9 +597,19 @@ test('an unchanged email in a full employee form preserves sessions, devices and
   assert.equal((await api().post('/v1/auth/refresh').send({ refreshToken: employee.refreshToken })).status, 200);
 });
 
-test('actual email changes, password updates and suspension still revoke all sessions, devices and pending OTPs', async () => {
+test('direct employee email edits cannot bypass dual proof and other-admin approval', async () => {
+  const admin=await account({role:'admin'}),employee=await account();await linkDevice(employee);
+  const changed=await api().patch(`/v1/employees/${employee.id}`).set(auth(admin.accessToken)).send({email:'bypass@example.test'});
+  assert.equal(changed.status,422);assert.equal(changed.body.error.code,'EMAIL_CHANGE_WORKFLOW_REQUIRED');
+  assert.equal((await api().get('/v1/me').set(auth(employee.accessToken))).body.data.email,employee.email);
+  assert.equal((await pool.query('SELECT id FROM notification_devices WHERE user_id=$1',[employee.id])).rowCount,1);
+  assert.equal((await api().patch(`/v1/employees/${employee.id}`).set(auth(admin.accessToken)).send({email:employee.email.toUpperCase(),fullName:'Still Authenticated'})).status,200);
+  assert.equal((await api().get('/v1/me').set(auth(employee.accessToken))).status,200);
+});
+
+test('password updates and suspension still revoke all sessions, devices and pending OTPs', async () => {
   const admin = await account({ role: 'admin' });
-  for (const [index, changes] of [{ email: 'changed@example.test' }, { password: 'A-different-test-password-29' }, { status: 'suspended' }].entries()) {
+  for (const [index, changes] of [{ password: 'A-different-test-password-29' }, { status: 'suspended' }].entries()) {
     const employee = await account(); await linkDevice(employee, fid(index + 10));
     timestamp += 61000;
     const challenge = await api().post('/v1/auth/login').send({ username: employee.username, password });
@@ -749,7 +759,7 @@ test('CRUD removes an unreferenced branch after its only employee is deleted', a
   assert.equal((await api().get(`/v1/employees/${id}`).set(auth(admin.accessToken))).status, 404);
   assert.equal((await api().delete(`/v1/branches/${office.id}`).set(auth(admin.accessToken))).status, 200);
 });
-test('face enrollment and login use actual recognition and still require email OTP', async () => {
+test('face enrollment and cross-device login use actual recognition with no email OTP', async () => {
   const sharp = (await import('sharp')).default;
   const fixture = await readFile(new URL('../src/face/fixtures/opencv-sface-demo.jpg', import.meta.url));
   const target = (await sharp(fixture).extract({ left: 215, top: 30, width: 215, height: 265 }).jpeg({ quality: 95 }).toBuffer()).toString('base64');
@@ -767,11 +777,11 @@ test('face enrollment and login use actual recognition and still require email O
   assert.equal(mail.length, mailBefore);
   const login = await api().post('/v1/auth/face-login').send({ username: user.username, imageBase64: same });
   assert.equal(login.status, 200);
-  assert.equal(login.body.data.accessToken, undefined);
-  assert.equal(login.body.data.purpose, 'face_login');
-  const verified = await verify(login.body.data.challengeId);
-  assert.equal(verified.status, 200);
-  assert.equal(verified.body.data.user.id, user.id);
+  assert.equal(typeof login.body.data.accessToken, 'string');
+  assert.equal(login.body.data.challengeId, undefined);
+  assert.equal(login.body.data.user.id, user.id);
+  assert.equal(mail.length, mailBefore);
+  assert.equal((await api().get('/v1/me').set(auth(login.body.data.accessToken))).status, 200);
   assert.equal((await api().delete('/v1/face/enroll').set(auth(user.accessToken))).status, 200);
   assert.equal((await api().get('/v1/face/status').set(auth(user.accessToken))).body.data.enrolled, false);
 });

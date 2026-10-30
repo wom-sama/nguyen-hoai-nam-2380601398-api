@@ -130,11 +130,11 @@ export function createResources({ pool, now, timeZone = 'Asia/Bangkok', enqueueN
       if (input.branchId) await find(db, 'branches', input.branchId);
       const { password: newPassword, ...fields } = input;
       const emailChanged = input.email !== undefined && input.email !== employee.email;
+      if (emailChanged) fail(422, 'EMAIL_CHANGE_WORKFLOW_REQUIRED', 'Đổi email phải xác minh email cũ/mới và được quản trị viên khác duyệt trong mục hồ sơ.');
       const profileChanged = ['fullName','role','status','branchId'].some(key => Object.hasOwn(fields, key) && fields[key] !== employee[columns[key]]);
       let updated = Object.keys(fields).length ? await updateRow(db, 'users', recordId, fields) : employee;
       if (newPassword) updated = (await db.query('UPDATE users SET password_hash=$1 WHERE id=$2 RETURNING *', [await hashPassword(newPassword), recordId])).rows[0];
-      if (emailChanged) updated = (await db.query('UPDATE users SET email_verified=false WHERE id=$1 RETURNING *', [recordId])).rows[0];
-      if (newPassword || emailChanged || input.status === 'suspended') {
+      if (newPassword || input.status === 'suspended') {
         await db.query('UPDATE sessions SET revoked_at=$1 WHERE user_id=$2 AND revoked_at IS NULL', [now(), recordId]);
         await db.query('DELETE FROM notification_devices WHERE user_id=$1', [recordId]);
         await db.query('UPDATE otp_challenges SET consumed_at=$1 WHERE user_id=$2 AND consumed_at IS NULL', [now(), recordId]);

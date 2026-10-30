@@ -2,6 +2,34 @@
 
 API Node.js/PostgreSQL dành cho app Flutter. Chỉ triển khai trên dịch vụ có HTTPS để nộp bài; app không được cấu hình API localhost. README mô tả source, cấu hình và bằng chứng kiểm chứng; trạng thái API/email production cần đối chiếu với kết quả triển khai thực tế.
 
+## Bổ sung hồ sơ, giao diện và đăng nhập — 1.1.0
+
+Mọi route dưới đây dùng envelope `{data:...}`; các route hồ sơ/duyệt cần phiên active và email đã xác minh. `GET /me` chỉ thêm `profileVersion`, không trả hoặc tải các ảnh từ bảng settings riêng.
+
+| Route | Nội dung |
+|---|---|
+| `GET /me/profile` | `{fullName,username,email,phone,address,avatarBase64,appearance:{fontScale,textColor,primaryColor,backgroundBase64},profileVersion}` |
+| `PATCH /me/profile` | Chỉ `fullName,phone,address,avatarBase64`; username không sửa tại đây, email dùng quy trình riêng |
+| `PATCH /me/appearance` | `fontScale`0,8–1,6; `textColor/primaryColor` dạng `#RRGGBB`; `backgroundBase64` hoặc null |
+| `POST /me/email-change` | `{newEmail}`; gửi hai OTP riêng tới email cũ/mới; trả202 `{requestId,maskedOldEmail,maskedNewEmail,status,expiresAt,retryAfterSeconds}` |
+| `GET /me/email-change` | Yêu cầu mới nhất của chính mình hoặc null |
+| `POST /me/email-change/:id/verify` | `{oldCode,newCode}`; đúng cả hai chuyển sang `pending_approval` |
+| `GET /email-change-requests` | Chỉ admin; danh sách chờ duyệt chưa hết hạn |
+| `POST /email-change-requests/:id/review` | `{decision:'approved'|'rejected'}`; phải là admin khác người đổi email |
+| `GET /fingerprint/status?deviceId=<UUID>` | `{registered,device,canEnroll,username}`; kiểm tra trước khi tạo khóa thiết bị |
+| `POST /fingerprint/enroll` | `{deviceId,deviceName,publicKey}` SPKI PEM RSA2048–4096 hoặc P-256; cần phiên password+OTP trong15phút |
+| `DELETE /fingerprint/devices/:id` | Thu hồi liên kết thiết bị của chính tài khoản |
+| `POST /auth/fingerprint/challenge` | `{username,deviceId}`; nonce2phút dùng một lần, trả `{challengeId,payload,expiresAt}` |
+| `POST /auth/fingerprint/verify` | `{username,deviceId,challengeId,signature}`; chữ ký SHA256 base64 hợp lệ cấp phiên trực tiếp |
+
+Ảnh avatar tối đa300KiB, ảnh nền650KiB, PNG/JPEG raw base64 canonical hoặc null; không nhận URL/data URL, không giải mã pixel hay tải ảnh từ xa. Giá trị giao diện mặc định font1, chữ `#402D37`, màu chính `#AA496C`; thay đổi thực sự tăng version và xếp `profile_updated` của đúng tài khoản. Hồ sơ và giao diện được lưu backend, không chỉ lưu trên máy.
+
+Hai OTP đổi email hết hạn10phút, tối đa5lần thử và cooldown60giây khi tạo yêu cầu thay thế. Sai mã trả422 `EMAIL_CHANGE_OTP_INVALID` để không kích hoạt refresh/retry401 của client; lần sai thứ5 trả429. HMAC có context request/email/old–new riêng; transport email chung vẫn dùng purpose `login` để tương thích relay đang triển khai, các mã này không dùng đăng nhập được. Xác minh xong cho admin24giờ duyệt. Admin không tự duyệt; chỉ một admin thì cần admin khác hợp lệ trước khi đổi email của mình. Duyệt kiểm lại email cũ/uniqueness/proof trong transaction, đổi email đã xác minh rồi thu hồi mọi phiên/OTP/push/vân tay của chủ yêu cầu. PATCH `/employees/:id` không được đổi email thật (`422 EMAIL_CHANGE_WORKFLOW_REQUIRED`); gửi lại email đã chuẩn hóa không đổi vẫn giữ phiên. Người duyệt không bị thu hồi phiên.
+
+Face-login hiện đối chiếu YuNet/SFace thật rồi cấp phiên trực tiếp, không gửi OTP tiếp; tài khoản phải active/verified và có mẫu đã đăng ký. Username+mật khẩu vẫn cần OTP. Vân tay là chữ ký khóa thiết bị, không gửi dữ liệu vân tay lên server; bằng chứng server/crypto không tự chứng minh cảm biến native hoặc khả năng chống giả mạo của khuôn mặt.
+
+Kiểm chứng source hiện tại: **129/129 backend tests đạt**. Kiểm tra PostgreSQL thật trong schema riêng **11/11 đạt**, gồm migration008/009 lặp hai lần, auth/OTP handlers, settings nhẹ `/me`, P-256 nonce/chữ ký/replay, hai OTP và admin khác duyệt, thu hồi mọi binding; schema đã dọn. Mailbox/FCM của lần kiểm tra này là provider test, không gửi thư/push thật hoặc sửa dữ liệu nghiệp vụ sản xuất. Không suy ra native cảm biến đã đạt từ kiểm thử server.
+
 Bổ sung dịch camera trực tiếp: OCR/dịch trên điện thoại; người dùng chủ động lưu văn bản qua API và đọc lại lịch sử riêng. Hợp đồng3route, idempotency và phạm vi quyền ở [LIVE_CAMERA_TRANSLATION.md](docs/LIVE_CAMERA_TRANSLATION.md). Backend sau bổ sung đạt **96/96** kiểm thử;12checks PostgreSQL camera được kiểm riêng với schema tạm đã dọn.
 
 ## Chạy và deploy
@@ -127,7 +155,7 @@ Mọi endpoint nghiệp vụ dưới `/v1`. Thành công: `{ "data": ... }`. Dan
 | `POST /auth/resend-otp` | `challengeId`; trả thông tin challenge được cập nhật |
 | `POST /auth/refresh` | `refreshToken`; xoay token, trả phiên mới |
 | `POST /auth/logout` | `refreshToken`; thu hồi cả phiên tương ứng |
-| `POST /auth/face-login` | `username, imageBase64`; đối chiếu thật tại server rồi trả challenge OTP |
+| `POST /auth/face-login` | `username, imageBase64`; đối chiếu thật tại server rồi trả phiên trực tiếp, không OTP |
 | `GET /me` | Hồ sơ hiện tại; cho phép tài khoản pending xem trạng thái |
 | `GET/POST /employees`, `GET/PATCH/DELETE /employees/:id` | Admin tạo/sửa/xóa; quản lý đọc nhân viên chi nhánh; nhân viên đọc chính mình |
 | `GET/POST /branches`, `GET/PATCH/DELETE /branches/:id` | Admin thay đổi; tài khoản khác đọc chi nhánh được phân |
@@ -147,9 +175,9 @@ Mọi endpoint nghiệp vụ dưới `/v1`. Thành công: `{ "data": ... }`. Dan
 
 Challenge OTP gồm `challengeId, maskedEmail, expiresAt, retryAfterSeconds, purpose`. `purpose` là `register`, `login` hoặc `face_login`. OTP sáu chữ số, có hiệu lực 10 phút, tối đa 5 lần nhập sai; gửi lại cách nhau 60 giây, tối đa 5 lần/challenge; gửi lại làm mã trước mất hiệu lực. Token chỉ được cấp khi OTP đúng và chưa được dùng. Access token 15 phút, refresh token 30 ngày; token refresh đã xoay mà bị dùng lại sẽ thu hồi cả phiên. Mật khẩu dùng scrypt; OTP dùng HMAC với khóa riêng; database chỉ lưu hash của refresh token.
 
-User trả về: `id, fullName, username, email, role, status, branchId, createdAt, emailVerified`. `role` là `admin/manager/employee`, `status` là `pending/active/suspended`. Tự đăng ký luôn là employee/pending; sau xác minh email vẫn phải chờ admin phê duyệt. Mọi request kiểm tra quyền và trạng thái hiện tại từ DB, không tin role do client gửi. Không thể xóa/hạ quyền admin hoạt động cuối cùng. Xóa nhân viên là xóa mềm để giữ lịch sử, đồng thời thu hồi phiên, xóa mẫu mặt và chia sẻ vị trí.
+User trả về: `id, fullName, username, email, role, status, branchId, createdAt, emailVerified, profileVersion`. `role` là `admin/manager/employee`, `status` là `pending/active/suspended`. Tự đăng ký luôn là employee/pending; sau xác minh email vẫn phải chờ admin phê duyệt. Mọi request kiểm tra quyền và trạng thái hiện tại từ DB, không tin role do client gửi. Không thể xóa/hạ quyền admin hoạt động cuối cùng. Xóa nhân viên là xóa mềm để giữ lịch sử, đồng thời thu hồi phiên, xóa mẫu mặt và chia sẻ vị trí.
 
-Branch: `name, address, latitude, longitude, radiusMeters` (20–5000m), thêm `timePolicy` bên dưới. Shift ghi bằng `title, branchId, employeeId, startsAt, endsAt`; giờ kết thúc phải sau giờ bắt đầu, cho phép ca qua ngày. Trạng thái `scheduled/in_progress/completed` do server quản lý từ chấm công/điều chỉnh: ca mới chỉ nhận trạng thái absent hoặc `scheduled`, PATCH từ chối trường `status` với `422 SHIFT_STATUS_READ_ONLY`. Username 3–32 ký tự chữ/số/`.`/`_`; mật khẩu 10–128 ký tự. PATCH chỉ gửi các trường thực sự đổi; trường không gửi được giữ nguyên.
+Branch: `name, address, latitude, longitude, radiusMeters` (20–200000m sau migration006), thêm `timePolicy` bên dưới. Shift ghi bằng `title, branchId, employeeId, startsAt, endsAt`; giờ kết thúc phải sau giờ bắt đầu, cho phép ca qua ngày. Trạng thái `scheduled/in_progress/completed` do server quản lý từ chấm công/điều chỉnh: ca mới chỉ nhận trạng thái absent hoặc `scheduled`, PATCH từ chối trường `status` với `422 SHIFT_STATUS_READ_ONLY`. Username 3–32 ký tự chữ/số/`.`/`_`; mật khẩu 10–128 ký tự. PATCH chỉ gửi các trường thực sự đổi; trường không gửi được giữ nguyên.
 
 Admin có thể POST/PATCH chi nhánh với toàn bộ đối tượng `timePolicy` (bốn số nguyên 0–1440 phút):
 

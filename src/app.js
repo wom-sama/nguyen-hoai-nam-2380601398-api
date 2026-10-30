@@ -4,6 +4,8 @@ import { createAuth } from './auth.js';
 import { createResources } from './resources.js';
 import { createNotifications } from './notifications.js';
 import { createCameraTranslations } from './camera-translations.js';
+import { createFingerprint } from './fingerprint.js';
+import { createProfile } from './profile.js';
 
 export function createApp({ pool, config, mailer, now = () => new Date(), pushProvider, autoStartNotifications = false }) {
   const app = express();
@@ -16,6 +18,7 @@ export function createApp({ pool, config, mailer, now = () => new Date(), pushPr
     next();
   });
   const auth = createAuth({ pool, config, mailer, now });
+  const fingerprint = createFingerprint({ pool, config, now, issueSession: auth.issueSession });
   const failedProfileAuth = rateLimit({ now, max: 500 });
   // Profile polling has a bounded pre-auth IP gate and, after JWT/session
   // verification, a user budget shared across that user's devices and IPs.
@@ -36,7 +39,9 @@ export function createApp({ pool, config, mailer, now = () => new Date(), pushPr
     catch { res.status(503).json({ error: { code: 'DATABASE_UNAVAILABLE', message: 'Cơ sở dữ liệu chưa sẵn sàng.' } }); }
   });
   app.use('/v1/auth', auth.router);
+  app.use('/v1/auth', fingerprint.publicRouter);
   app.use('/v1', auth.requireAuth, auth.requireActive, notifications.router, createCameraTranslations({pool,now}),
+    fingerprint.privateRouter, createProfile({ pool, config, mailer, now, enqueueNotification: notifications.enqueue }),
     createResources({ pool, now, timeZone: config.timeZone, enqueueNotification: notifications.enqueue }));
   app.use((_req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy API.' } }));
   app.use((error, _req, res, _next) => {

@@ -27,7 +27,8 @@ export function constantEqual(left, right) {
 }
 export function publicUser(row) {
   return { id: row.id, fullName: row.full_name, username: row.username, email: row.email, role: row.role,
-    status: row.status, branchId: row.branch_id, createdAt: row.created_at, emailVerified: row.email_verified };
+    status: row.status, branchId: row.branch_id, createdAt: row.created_at, emailVerified: row.email_verified,
+    profileVersion: row.profile_version ?? 1 };
 }
 export async function transaction(pool, action) {
   const client = await pool.connect();

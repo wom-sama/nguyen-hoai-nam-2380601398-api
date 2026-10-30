@@ -31,9 +31,9 @@ export function createAuth({ pool, config, mailer, now }) {
     await sendCode(row, user, code);
     return challengeView(row, user);
   }
-  async function sessionTokens(db, user, sessionId = randomUUID()) {
+  async function sessionTokens(db, user, sessionId = randomUUID(), method = 'password_otp') {
     const time = now();
-    if (!arguments[2]) await db.query('INSERT INTO sessions(id,user_id,created_at) VALUES($1,$2,$3)', [sessionId, user.id, time]);
+    if (!arguments[2]) await db.query('INSERT INTO sessions(id,user_id,created_at,auth_method) VALUES($1,$2,$3,$4)', [sessionId, user.id, time, method]);
     const refreshToken = opaqueToken();
     await db.query('INSERT INTO refresh_tokens(id,session_id,token_hash,expires_at) VALUES($1,$2,$3,$4)', [randomUUID(), sessionId, tokenHash(refreshToken), new Date(time.getTime() + 30 * 86400000)]);
     const issuedAt = Math.floor(time.getTime() / 1000);
@@ -144,7 +144,7 @@ export function createAuth({ pool, config, mailer, now }) {
     });
     res.json({ data: { loggedOut: true } });
   });
-  router.post('/face-login', async (req, res) => {
+  router.post('/face-login', rateLimit({ now, max: 15, windowMs: 5 * 60000 }), async (req, res) => {
     const input = parse(z.object({ username, imageBase64: z.string().min(16).max(2800000) }).strict(), req.body);
     const user = (await pool.query("SELECT * FROM users WHERE username=$1 AND status='active' AND email_verified=true AND deleted_at IS NULL", [input.username])).rows[0];
     if (!user) throw loginFailure();
@@ -153,9 +153,16 @@ export function createAuth({ pool, config, mailer, now }) {
     const recognition = await loadFace();
     const probe = await recognition.extractEmbedding(input.imageBase64);
     if (!recognition.compareEmbeddings(face.embedding, probe).matches) throw loginFailure();
-    res.json({ data: await issueChallenge(user, 'face_login') });
+    const data = await transaction(pool, async db => {
+      const current = (await db.query("SELECT * FROM users WHERE id=$1 AND status='active' AND email_verified=true AND deleted_at IS NULL FOR UPDATE", [user.id])).rows[0];
+      if (!current) throw loginFailure();
+      const currentFace = (await db.query('SELECT embedding FROM face_templates WHERE user_id=$1', [user.id])).rows[0];
+      if (!currentFace || !recognition.compareEmbeddings(currentFace.embedding, probe).matches) throw loginFailure();
+      return sessionTokens(db, current, undefined, 'face');
+    });
+    res.json({ data });
   });
-  return { router, requireAuth, requireActive };
+  return { router, requireAuth, requireActive, issueSession: (db, user, method) => sessionTokens(db, user, undefined, method) };
 }
 
 export async function loadFace() {
