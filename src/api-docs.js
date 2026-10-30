@@ -15,7 +15,7 @@ export function createApiDocs(){
  const assets=getAbsoluteFSPath();
  router.get('/v1/docs-assets/:file',(req,res,next)=>{
   if(!['swagger-ui.css','swagger-ui-bundle.js'].includes(req.params.file))return res.status(404).json({error:{code:'NOT_FOUND',message:'Không tìm thấy tài nguyên.'}});
-  return res.sendFile(req.params.file,{root:assets},next);
+  return res.sendFile(req.params.file,{root:assets},error=>{if(error)next(error);});
  });
  return router;
 }
