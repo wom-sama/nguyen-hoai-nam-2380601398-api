@@ -6,6 +6,7 @@ import { createNotifications } from './notifications.js';
 import { createCameraTranslations } from './camera-translations.js';
 import { createFingerprint } from './fingerprint.js';
 import { createProfile } from './profile.js';
+import { createApiDocs } from './api-docs.js';
 
 export function createApp({ pool, config, mailer, now = () => new Date(), pushProvider, autoStartNotifications = false }) {
   const app = express();
@@ -30,6 +31,7 @@ export function createApp({ pool, config, mailer, now = () => new Date(), pushPr
   (req, res) => res.json({ data: publicUser(req.user) }));
   app.use(rateLimit({ now, max: 500 }));
   app.use(express.json({ limit: '3mb', strict: true }));
+  app.use(createApiDocs());
   if (autoStartNotifications) app.use((req, res, next) => {
     if (['POST','PATCH'].includes(req.method)) res.once('finish', () => { if (res.statusCode < 400) notifications.kick(); });
     next();

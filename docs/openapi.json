@@ -1,0 +1,3556 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Nguyễn Hoài Nam · API chấm công",
+    "version": "1.1.0",
+    "description": "MSSV 2380601398 · Nhóm 8 · Sáng thứ 6.\n\n**Kiểm tra nhanh:** mở GET /health → Try it out → Execute.\n\n**Đăng nhập:** POST /auth/login với tên đăng nhập và mật khẩu → lấy challengeId → POST /auth/verify-otp với mã email → sao chép accessToken → bấm Authorize, dán token (không thêm chữ Bearer). Đăng ký mới dùng email cá nhân và chờ admin duyệt/gán chi nhánh.\n\nAPI nghiệp vụ kiểm quyền admin/quản lý/nhân viên phía server. Try it out gửi yêu cầu thật; POST/PATCH/DELETE có thể thay đổi dữ liệu. Dùng dữ liệu kiểm thử được phép. Phiên Authorize không lưu qua tải lại trang; không chia sẻ token hoặc ảnh chụp response đăng nhập.\n\nKhuôn mặt cấp phiên trực tiếp không OTP. Vân tay cần khóa riêng Android và chữ ký nonce, không mô phỏng bằng nút bấm trên web. OCR/dịch trực tiếp chạy trong APK; API camera-translations lưu văn bản kết quả."
+  },
+  "servers": [
+    {
+      "url": "/v1",
+      "description": "API đang mở trên cùng server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "01 · Tài khoản và OTP"
+    },
+    {
+      "name": "02 · Nhân viên"
+    },
+    {
+      "name": "03 · Chi nhánh"
+    },
+    {
+      "name": "04 · Ca làm"
+    },
+    {
+      "name": "05 · Chấm công"
+    },
+    {
+      "name": "06 · Điều chỉnh công"
+    },
+    {
+      "name": "07 · Bàn giao kiểm chứng"
+    },
+    {
+      "name": "08 · Vị trí"
+    },
+    {
+      "name": "09 · Lịch sử dịch"
+    },
+    {
+      "name": "10 · Khuôn mặt"
+    },
+    {
+      "name": "11 · Vân tay"
+    },
+    {
+      "name": "12 · Hồ sơ và giao diện"
+    },
+    {
+      "name": "13 · Duyệt email"
+    },
+    {
+      "name": "14 · Báo cáo"
+    },
+    {
+      "name": "15 · Dashboard"
+    },
+    {
+      "name": "16 · Thông báo"
+    },
+    {
+      "name": "00 · Kết nối"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "00 · Kết nối"
+        ],
+        "summary": "Kiểm tra API và kết nối database",
+        "operationId": "get__health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": []
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "12 · Hồ sơ và giao diện"
+        ],
+        "summary": "Hồ sơ phiên đăng nhập hiện tại",
+        "operationId": "get__me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "Đăng ký tài khoản nhân viên bằng email",
+        "operationId": "post__auth_register",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fullName": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "fullName": "Họ tên của bạn",
+                "username": "ten_dang_nhap",
+                "email": "your-email@example.com",
+                "password": "NhapMatKhauCuaBan"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "1. Đăng nhập bằng mật khẩu → nhận challenge OTP",
+        "operationId": "post__auth_login",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "username": "ten_dang_nhap",
+                "password": "NhapMatKhauCuaBan"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-otp": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "2. Xác nhận OTP email → nhận accessToken",
+        "operationId": "post__auth_verify_otp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challengeId": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "challengeId": "00000000-0000-4000-8000-000000000001",
+                "code": "000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/resend-otp": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "Gửi lại OTP sau thời gian chờ",
+        "operationId": "post__auth_resend_otp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challengeId": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "challengeId": "00000000-0000-4000-8000-000000000001"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "Refresh - xoay token - không chạy lặp token cũ",
+        "operationId": "post__auth_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "refreshToken": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/face-login": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "Đăng nhập mặt - nhận phiên trực tiếp, không OTP (1.1.0)",
+        "operationId": "post__auth_face_login",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "imageBase64": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "username": "nhap_gia_tri",
+                "imageBase64": "nhap_gia_tri"
+              }
+            }
+          }
+        },
+        "description": "So khớp ảnh với mẫu đã đăng ký, trả accessToken/refreshToken/user trực tiếp; không phát OTP."
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "Đăng xuất và xóa biến phiên Postman",
+        "operationId": "post__auth_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "refreshToken": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/employees": {
+      "get": {
+        "tags": [
+          "02 · Nhân viên"
+        ],
+        "summary": "Danh sách nhân viên theo quyền",
+        "operationId": "get__employees",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "02 · Nhân viên"
+        ],
+        "summary": "Tạo nhân viên - admin",
+        "operationId": "post__employees",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fullName": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              },
+              "example": {
+                "fullName": "nhap_gia_tri",
+                "username": "nhap_gia_tri",
+                "email": "nhap_gia_tri",
+                "password": "NhapMatKhauCuaBan",
+                "role": "employee",
+                "status": "pending",
+                "branchId": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "/employees/{id}": {
+      "get": {
+        "tags": [
+          "02 · Nhân viên"
+        ],
+        "summary": "Chi tiết nhân viên",
+        "operationId": "get__employees__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "02 · Nhân viên"
+        ],
+        "summary": "Đổi mật khẩu tài khoản - admin - thu hồi phiên",
+        "operationId": "patch__employees__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "password": "NhapMatKhauCuaBan"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "02 · Nhân viên"
+        ],
+        "summary": "Xóa nhân viên - admin - soft delete",
+        "operationId": "delete__employees__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/branches": {
+      "get": {
+        "tags": [
+          "03 · Chi nhánh"
+        ],
+        "summary": "Danh sách chi nhánh",
+        "operationId": "get__branches",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "03 · Chi nhánh"
+        ],
+        "summary": "Tạo chi nhánh - dữ liệu thử được duyệt",
+        "operationId": "post__branches",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branches/{id}": {
+      "get": {
+        "tags": [
+          "03 · Chi nhánh"
+        ],
+        "summary": "Chi tiết chi nhánh",
+        "operationId": "get__branches__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "03 · Chi nhánh"
+        ],
+        "summary": "Sửa tên và địa chỉ chi nhánh",
+        "operationId": "patch__branches__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "name": "nhap_gia_tri",
+                "address": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "03 · Chi nhánh"
+        ],
+        "summary": "Xóa chi nhánh không tham chiếu",
+        "operationId": "delete__branches__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/shifts": {
+      "get": {
+        "tags": [
+          "04 · Ca làm"
+        ],
+        "summary": "Danh sách ca theo quyền",
+        "operationId": "get__shifts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "04 · Ca làm"
+        ],
+        "summary": "Tạo ca",
+        "operationId": "post__shifts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "branchId": {
+                    "type": "string"
+                  },
+                  "employeeId": {
+                    "type": "string"
+                  },
+                  "startsAt": {
+                    "type": "string"
+                  },
+                  "endsAt": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "title": "nhap_gia_tri",
+                "branchId": "00000000-0000-4000-8000-000000000001",
+                "employeeId": "00000000-0000-4000-8000-000000000001",
+                "startsAt": "nhap_gia_tri",
+                "endsAt": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shifts/{id}": {
+      "get": {
+        "tags": [
+          "04 · Ca làm"
+        ],
+        "summary": "Chi tiết ca và timeWindow",
+        "operationId": "get__shifts__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "04 · Ca làm"
+        ],
+        "summary": "Đổi kế hoạch ca chưa có history",
+        "operationId": "patch__shifts__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "employeeId": {
+                    "type": "string"
+                  },
+                  "branchId": {
+                    "type": "string"
+                  },
+                  "startsAt": {
+                    "type": "string"
+                  },
+                  "endsAt": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "employeeId": "00000000-0000-4000-8000-000000000001",
+                "branchId": "00000000-0000-4000-8000-000000000001",
+                "startsAt": "nhap_gia_tri",
+                "endsAt": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "04 · Ca làm"
+        ],
+        "summary": "Xóa ca chưa có tham chiếu",
+        "operationId": "delete__shifts__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/attendance": {
+      "get": {
+        "tags": [
+          "05 · Chấm công"
+        ],
+        "summary": "Danh sách attendance",
+        "operationId": "get__attendance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/attendance/check-in": {
+      "post": {
+        "tags": [
+          "05 · Chấm công"
+        ],
+        "summary": "Chấm vào - server time",
+        "operationId": "post__attendance_check_in",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/check-out": {
+      "post": {
+        "tags": [
+          "05 · Chấm công"
+        ],
+        "summary": "Chấm ra - server time",
+        "operationId": "post__attendance_check_out",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/corrections": {
+      "get": {
+        "tags": [
+          "06 · Điều chỉnh công"
+        ],
+        "summary": "Danh sách đơn",
+        "operationId": "get__corrections",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "06 · Điều chỉnh công"
+        ],
+        "summary": "Gửi đơn điều chỉnh giờ vào",
+        "operationId": "post__corrections",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "shiftId": {
+                    "type": "string"
+                  },
+                  "requestedCheckIn": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "shiftId": "00000000-0000-4000-8000-000000000001",
+                "requestedCheckIn": "nhap_gia_tri",
+                "reason": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/corrections/{id}": {
+      "get": {
+        "tags": [
+          "06 · Điều chỉnh công"
+        ],
+        "summary": "Chi tiết đơn và before-after audit",
+        "operationId": "get__corrections__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "06 · Điều chỉnh công"
+        ],
+        "summary": "Từ chối - quản lý khác chủ đơn",
+        "operationId": "patch__corrections__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "resolutionNote": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "status": "rejected",
+                "resolutionNote": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "06 · Điều chỉnh công"
+        ],
+        "summary": "Rút đơn pending của mình",
+        "operationId": "delete__corrections__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/location-shares": {
+      "post": {
+        "tags": [
+          "08 · Vị trí"
+        ],
+        "summary": "Share vị trí hiện tại",
+        "operationId": "post__location_shares",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "08 · Vị trí"
+        ],
+        "summary": "Các share chưa hết hạn theo quyền",
+        "operationId": "get__location_shares",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/location-shares/{id}": {
+      "delete": {
+        "tags": [
+          "08 · Vị trí"
+        ],
+        "summary": "Dừng share của mình",
+        "operationId": "delete__location_shares__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/handover-recipients": {
+      "get": {
+        "tags": [
+          "07 · Bàn giao kiểm chứng"
+        ],
+        "summary": "Người nhận hợp lệ cùng branch",
+        "operationId": "get__handover_recipients",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/handovers": {
+      "get": {
+        "tags": [
+          "07 · Bàn giao kiểm chứng"
+        ],
+        "summary": "Danh sách bàn giao",
+        "operationId": "get__handovers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "07 · Bàn giao kiểm chứng"
+        ],
+        "summary": "Tạo submitted trực tiếp1fact anchored BOTH",
+        "operationId": "post__handovers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "shiftId": {
+                    "type": "string"
+                  },
+                  "recipientId": {
+                    "type": "string"
+                  },
+                  "originalText": {
+                    "type": "string"
+                  },
+                  "translatedText": {
+                    "type": "string"
+                  },
+                  "sourceLanguage": {
+                    "type": "string"
+                  },
+                  "targetLanguage": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "translatedText": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "criticalFacts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "shiftId": "00000000-0000-4000-8000-000000000001",
+                "recipientId": "00000000-0000-4000-8000-000000000001",
+                "originalText": "nhap_gia_tri",
+                "translatedText": "nhap_gia_tri",
+                "sourceLanguage": "vi",
+                "targetLanguage": "en",
+                "items": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000001",
+                    "text": "nhap_gia_tri",
+                    "translatedText": "nhap_gia_tri",
+                    "state": "open"
+                  }
+                ],
+                "status": "submitted",
+                "criticalFacts": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000001",
+                    "kind": "nhap_gia_tri",
+                    "label": "nhap_gia_tri",
+                    "value": "nhap_gia_tri"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/handovers/{id}": {
+      "get": {
+        "tags": [
+          "07 · Bàn giao kiểm chứng"
+        ],
+        "summary": "Chi tiết bàn giao - lưu version hiện tại",
+        "operationId": "get__handovers__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "07 · Bàn giao kiểm chứng"
+        ],
+        "summary": "Recipient final riêng phiếu1fact - tự nhập criticalFactAnswer",
+        "operationId": "patch__handovers__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "07 · Bàn giao kiểm chứng"
+        ],
+        "summary": "Tác giả xóa draft",
+        "operationId": "delete__handovers__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/handovers/{id}/revisions": {
+      "get": {
+        "tags": [
+          "07 · Bàn giao kiểm chứng"
+        ],
+        "summary": "Lịch sử revision",
+        "operationId": "get__handovers__id__revisions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/face/status": {
+      "get": {
+        "tags": [
+          "10 · Khuôn mặt"
+        ],
+        "summary": "Trạng thái enrolled",
+        "operationId": "get__face_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/face/enroll": {
+      "post": {
+        "tags": [
+          "10 · Khuôn mặt"
+        ],
+        "summary": "Enroll ảnh mặt - user active",
+        "operationId": "post__face_enroll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "imageBase64": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "imageBase64": "nhap_gia_tri"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "10 · Khuôn mặt"
+        ],
+        "summary": "Xóa template của mình",
+        "operationId": "delete__face_enroll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "tags": [
+          "15 · Dashboard"
+        ],
+        "summary": "Dashboard theo quyền",
+        "operationId": "get__dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/reports/monthly": {
+      "get": {
+        "tags": [
+          "14 · Báo cáo"
+        ],
+        "summary": "Bảng tháng lọc branch và nhân viên - đúng scope",
+        "operationId": "get__reports_monthly",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "nhap_gia_tri"
+          },
+          {
+            "name": "branchId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "00000000-0000-4000-8000-000000000001"
+          },
+          {
+            "name": "employeeId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/notifications/status": {
+      "get": {
+        "tags": [
+          "16 · Thông báo"
+        ],
+        "summary": "Trạng thái FCM server",
+        "operationId": "get__notifications_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/notification-devices": {
+      "post": {
+        "tags": [
+          "16 · Thông báo"
+        ],
+        "summary": "Bind FID của SDK vào user-sid hiện tại",
+        "operationId": "post__notification_devices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "installationId": {
+                    "type": "string"
+                  },
+                  "firebaseProjectId": {
+                    "type": "string"
+                  },
+                  "platform": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "installationId": "00000000-0000-4000-8000-000000000001",
+                "firebaseProjectId": "00000000-0000-4000-8000-000000000001",
+                "platform": "android"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notification-devices/{id}": {
+      "delete": {
+        "tags": [
+          "16 · Thông báo"
+        ],
+        "summary": "Unbind device trong đúng user-sid",
+        "operationId": "delete__notification_devices__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/camera-translations": {
+      "post": {
+        "tags": [
+          "09 · Lịch sử dịch"
+        ],
+        "summary": "Lưu bản dịch chữ, không gửi ảnh",
+        "operationId": "post__camera_translations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientRequestId": {
+                    "type": "string"
+                  },
+                  "sourceLanguage": {
+                    "type": "string"
+                  },
+                  "targetLanguage": {
+                    "type": "string"
+                  },
+                  "originalText": {
+                    "type": "string"
+                  },
+                  "translatedText": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "clientRequestId": "00000000-0000-4000-8000-000000000001",
+                "sourceLanguage": "en",
+                "targetLanguage": "vi",
+                "originalText": "SHIFT STARTS AT 22:00",
+                "translatedText": "CA LÀM BẮT ĐẦU LÚC 22:00"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "09 · Lịch sử dịch"
+        ],
+        "summary": "20 bản dịch đã lưu mới nhất của mình",
+        "operationId": "get__camera_translations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/camera-translations/{id}": {
+      "delete": {
+        "tags": [
+          "09 · Lịch sử dịch"
+        ],
+        "summary": "Xóa một bản dịch của mình",
+        "operationId": "delete__camera_translations__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/me/profile": {
+      "get": {
+        "tags": [
+          "12 · Hồ sơ và giao diện"
+        ],
+        "summary": "GET /me/profile",
+        "operationId": "get__me_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "12 · Hồ sơ và giao diện"
+        ],
+        "summary": "PATCH /me/profile",
+        "operationId": "patch__me_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/appearance": {
+      "patch": {
+        "tags": [
+          "12 · Hồ sơ và giao diện"
+        ],
+        "summary": "PATCH /me/appearance",
+        "operationId": "patch__me_appearance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/email-change": {
+      "post": {
+        "tags": [
+          "12 · Hồ sơ và giao diện"
+        ],
+        "summary": "POST /me/email-change",
+        "operationId": "post__me_email_change",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "12 · Hồ sơ và giao diện"
+        ],
+        "summary": "GET /me/email-change",
+        "operationId": "get__me_email_change",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/me/email-change/{id}/verify": {
+      "post": {
+        "tags": [
+          "12 · Hồ sơ và giao diện"
+        ],
+        "summary": "POST /me/email-change/{id}/verify",
+        "operationId": "post__me_email_change__id__verify",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/email-change-requests": {
+      "get": {
+        "tags": [
+          "13 · Duyệt email"
+        ],
+        "summary": "GET /email-change-requests",
+        "operationId": "get__email_change_requests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/email-change-requests/{id}/review": {
+      "post": {
+        "tags": [
+          "13 · Duyệt email"
+        ],
+        "summary": "POST /email-change-requests/{id}/review",
+        "operationId": "post__email_change_requests__id__review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fingerprint/status": {
+      "get": {
+        "tags": [
+          "11 · Vân tay"
+        ],
+        "summary": "GET /fingerprint/status",
+        "operationId": "get__fingerprint_status",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/fingerprint/enroll": {
+      "post": {
+        "tags": [
+          "11 · Vân tay"
+        ],
+        "summary": "POST /fingerprint/enroll",
+        "operationId": "post__fingerprint_enroll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fingerprint/devices/{id}": {
+      "delete": {
+        "tags": [
+          "11 · Vân tay"
+        ],
+        "summary": "DELETE /fingerprint/devices/{id}",
+        "operationId": "delete__fingerprint_devices__id_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID bản ghi thật lấy từ GET tương ứng."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        }
+      }
+    },
+    "/auth/fingerprint/challenge": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "POST /auth/fingerprint/challenge",
+        "operationId": "post__auth_fingerprint_challenge",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/fingerprint/verify": {
+      "post": {
+        "tags": [
+          "01 · Tài khoản và OTP"
+        ],
+        "summary": "POST /auth/fingerprint/verify",
+        "operationId": "post__auth_fingerprint_verify",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thành công, kết quả trong data."
+          },
+          "201": {
+            "description": "Đã tạo bản ghi."
+          },
+          "202": {
+            "description": "Đã tạo yêu cầu xác minh."
+          },
+          "401": {
+            "description": "Chưa đăng nhập, OTP sai hoặc phiên không hợp lệ."
+          },
+          "403": {
+            "description": "Không đủ quyền hoặc tài khoản chưa được duyệt."
+          },
+          "404": {
+            "description": "Không tìm thấy hoặc ngoài phạm vi truy cập."
+          },
+          "409": {
+            "description": "Xung đột dữ liệu/trạng thái."
+          },
+          "422": {
+            "description": "Tham số không hợp lệ."
+          },
+          "429": {
+            "description": "Vượt giới hạn; chờ trước khi thử lại."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "description": "Xem schema yêu cầu trong source backend; chỉ gửi các trường được hỗ trợ.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
